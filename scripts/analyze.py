@@ -52,9 +52,16 @@ def earnings_accuracy() -> None:
         return None if pd.isna(v) else float(v)
 
     fc["actual"] = [actual(m, c, y) for m, c, y in zip(fc["metric"], fc["company"], fc["target_year"])]
-    fc["pct_diff"] = [pct_diff(a, p) for a, p in zip(fc["actual"], fc["predicted"])]
+    fc["predicted"] = pd.to_numeric(fc["predicted"], errors="coerce")
+    fc["pct_diff"] = pd.to_numeric(
+        [pct_diff(a, p) for a, p in zip(fc["actual"], fc["predicted"])], errors="coerce"
+    )
     fc["abs_pct"] = fc["pct_diff"].abs()
     fc["horizon"] = fc["target_year"] - fc["base_year"]
+
+    if fc["predicted"].notna().sum() == 0:
+        print("[skip] forecasts_earnings.csv has no predicted values yet - fill it in.")
+        return
 
     fc.to_csv(os.path.join(INPUTS, "earnings_scored.csv"), index=False)
     print("\n=== Earnings forecast accuracy (MAPE %) ===")
@@ -100,8 +107,12 @@ def price_accuracy() -> None:
             "pct_diff": pct_diff(actual, pred),
         })
     out = pd.DataFrame(rows)
+    out["pct_diff"] = pd.to_numeric(out["pct_diff"], errors="coerce")
     out["abs_pct"] = out["pct_diff"].abs()
     out.to_csv(os.path.join(INPUTS, "prices_scored.csv"), index=False)
+    if out["predicted"].notna().sum() == 0:
+        print("\n[skip] forecasts_prices.csv has no predicted values yet - fill it in.")
+        return
     print("\n=== Stock-price forecast accuracy ===")
     print("Directional hit-rate by target:")
     print(out.groupby("target")["direction_correct"].mean().round(2).to_string())
@@ -113,7 +124,7 @@ def price_accuracy() -> None:
 # ------------------------------------------------ Q4 buy-and-hold helper ----
 def buy_and_hold(company: str, announce_date: str, hold_days: int = 5) -> float | None:
     """Buy at open of day +1 after the announcement, hold to day +hold_days; return %."""
-    prices = pd.read_csv(os.path.join(DATA, "prices_2024_2025.csv"), index_col=0, parse_dates=True)
+    prices = pd.read_csv(os.path.join(DATA, "prices_daily.csv"), index_col=0, parse_dates=True)
     if company not in prices.columns:
         return None
     s = prices[company].dropna()
@@ -125,9 +136,50 @@ def buy_and_hold(company: str, announce_date: str, hold_days: int = 5) -> float 
     return (sell / buy - 1.0) * 100.0
 
 
+def price_n_days_before(company: str, announce_date: str, n: int = 5) -> float | None:
+    prices = pd.read_csv(os.path.join(DATA, "prices_daily.csv"), index_col=0, parse_dates=True)
+    if company not in prices.columns:
+        return None
+    s = prices[company].dropna()
+    before = s[s.index < pd.Timestamp(announce_date)]
+    return float(before.iloc[-n]) if len(before) >= n else None
+
+
+def earnings_surprise_signal() -> None:
+    """
+    Q4: read inputs/earnings_announcements.csv with columns
+        company, announce_date, actual_eps, forecast_eps
+    Compute the surprise, the day+1..+5 buy-and-hold return, and test whether the
+    positive-surprise basket beats the negative-surprise basket.
+    Price 5 days prior is pulled automatically from data/prices_daily.csv.
+    """
+    f = os.path.join(INPUTS, "earnings_announcements.csv")
+    if not os.path.exists(f):
+        print("\n[skip] inputs/earnings_announcements.csv not found - fill the template first.")
+        return
+    df = pd.read_csv(f)
+    if df.empty or pd.to_numeric(df.get("actual_eps"), errors="coerce").notna().sum() == 0:
+        print("\n[skip] earnings_announcements.csv has no data yet - fill it in.")
+        return
+
+    df["price_5d_prior"] = [price_n_days_before(c, d, 5) for c, d in zip(df["company"], df["announce_date"])]
+    df["actual_eps"] = pd.to_numeric(df["actual_eps"], errors="coerce")
+    df["forecast_eps"] = pd.to_numeric(df["forecast_eps"], errors="coerce")
+    df["surprise"] = (df["actual_eps"] - df["forecast_eps"]) / df["price_5d_prior"]
+    df["bh_return_pct"] = [buy_and_hold(c, d, 5) for c, d in zip(df["company"], df["announce_date"])]
+    df["signal"] = df["surprise"].apply(lambda x: "positive" if x > 0 else ("negative" if x < 0 else "flat"))
+    df.to_csv(os.path.join(INPUTS, "earnings_surprise_scored.csv"), index=False)
+
+    print("\n=== Q4 earnings-surprise signal ===")
+    print("Avg day+1..+5 buy-and-hold return by signal (%):")
+    print(df.groupby("signal")["bh_return_pct"].mean().round(2).to_string())
+    print("\nSaved per-row scores: inputs/earnings_surprise_scored.csv")
+
+
 if __name__ == "__main__":
     earnings_accuracy()
     price_accuracy()
-    print("\nQ4 example (edit dates):",
-          "ULTRACEMCO around 2024-04-25 ->",
-          buy_and_hold("ULTRACEMCO", "2024-04-25"))
+    earnings_surprise_signal()
+    print("\nQ4 sanity check:",
+          "ULTRACEMCO buy&hold around 2024-04-25 ->",
+          round(buy_and_hold("ULTRACEMCO", "2024-04-25") or float("nan"), 2), "%")

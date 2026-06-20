@@ -1,0 +1,4 @@
+company,target,predicted,actual,base_31Dec2024,direction_correct,pct_diff,abs_pct
+ULTRACEMCO,jan,,11487.45,11426.35,False,,
+ULTRACEMCO,mar,,11509.55,11426.35,False,,
+ULTRACEMCO,dec,,11784.0,11426.35,False,,

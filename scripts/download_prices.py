@@ -40,8 +40,10 @@ def main() -> None:
     data_dir = os.path.join(base, "data")
     os.makedirs(data_dir, exist_ok=True)
 
+    # Start in 2021 so Q4 earnings-surprise windows (price 5 days before each
+    # FY2021-FY2025 results announcement, and the +1..+5 buy-and-hold) are covered.
     raw = yf.download(
-        list(SYMBOLS.values()), start="2024-01-01", end="2026-01-01",
+        list(SYMBOLS.values()), start="2021-01-01", end="2026-01-01",
         auto_adjust=False, progress=False,
     )
     close = raw["Close"].copy()
@@ -51,7 +53,7 @@ def main() -> None:
     close = close.reindex(columns=list(SYMBOLS.keys()))
 
     full = close.round(2)
-    full.to_csv(os.path.join(data_dir, "prices_2024_2025.csv"))
+    full.to_csv(os.path.join(data_dir, "prices_daily.csv"))  # 2021-2025 full history
     full.loc["2024-01-01":"2024-12-31"].to_csv(os.path.join(data_dir, "prices_2024.csv"))
 
     targets = pd.DataFrame({
@@ -64,7 +66,7 @@ def main() -> None:
 
     print("Price target actuals (Rs):")
     print(targets.to_string())
-    print("\nSaved: data/prices_2024.csv, prices_2024_2025.csv, price_targets.csv")
+    print("\nSaved: data/prices_2024.csv, prices_daily.csv (2021-2025), price_targets.csv")
 
 
 if __name__ == "__main__":
