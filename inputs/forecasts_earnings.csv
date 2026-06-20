@@ -1,0 +1,13 @@
+company,cap,base_year,metric,target_year,predicted
+ULTRACEMCO,Large,2021,Revenue,2022,
+ULTRACEMCO,Large,2021,Revenue,2023,
+ULTRACEMCO,Large,2021,Revenue,2024,
+ULTRACEMCO,Large,2021,NetIncome,2022,
+ULTRACEMCO,Large,2021,NetIncome,2023,
+ULTRACEMCO,Large,2021,NetIncome,2024,
+ULTRACEMCO,Large,2022,Revenue,2023,
+ULTRACEMCO,Large,2022,Revenue,2024,
+ULTRACEMCO,Large,2022,Revenue,2025,
+ULTRACEMCO,Large,2022,NetIncome,2023,
+ULTRACEMCO,Large,2022,NetIncome,2024,
+ULTRACEMCO,Large,2022,NetIncome,2025,
